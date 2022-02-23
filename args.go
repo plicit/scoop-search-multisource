@@ -126,7 +126,7 @@ type parsedArgs struct {
 	query   SearchQuery
 	sources SourceRefs
 	fields  string
-	cache   int
+	cache   float64
 	colors  *ColorMap
 	linelen int
 	hook    bool
@@ -163,8 +163,8 @@ func parseArgs() (args *parsedArgs) {
 	flag.BoolVar(&args.debug, "debug", false, "print debug info (query, fields, sources)")
 	flag.BoolVar(&args.hook, "hook", false, "print posh hook code to integrate with scoop")
 	flag.BoolVar(&args.merge, "merge", true, "merge the results from all sources into a single output (avoids duplicates)")
-	cache_default := 24 * 60
-	flag.IntVar(&args.cache, "cache", cache_default, fmt.Sprintf("cache duration in minutes. %d mins = %d days", cache_default, cache_default/60))
+	cache_default := 1.0
+	flag.Float64Var(&args.cache, "cache", cache_default, "cache duration in days.")
 	flag.Var(args.colors, "colors", `colormap for output. "none" deletes the colormap.`)
 	flag.IntVar(&args.linelen, "linelen", 120, "max line length for results (trims description)")
 	flag.StringVar(&args.fields, "fields", "name,bins", `app manifest fields to search: `+g_SearchQueryOptionsFieldsStr)
@@ -189,7 +189,7 @@ EXAMPLES:
 	}
 
 	// --cache X (in minutes)
-	g_CacheDuration = time.Duration(args.cache) * time.Minute
+	g_CacheDuration = time.Duration(args.cache * float64(24*time.Hour))
 
 	// --source: setup default sources
 	if args.sources == nil {

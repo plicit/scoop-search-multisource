@@ -70,8 +70,8 @@ EXAMPLE: scoops.exe -debug -merge=0 -source :active -source "if0: :rasa" -fields
 
 OPTIONS:
 
-  -cache int
-        cache duration in minutes. 1440 mins = 24 days (default 1440)
+  -cache float
+        cache duration in days. (default 1)
   -colors value
         colormap for output. "none" deletes the colormap. (default debug=light_red;app.name=yellow;app.name.installed=light_green;source.header=light_cyan;source.summary=source.status;totals=light_cyan)
   -debug
