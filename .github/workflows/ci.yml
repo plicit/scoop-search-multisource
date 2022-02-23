@@ -1,0 +1,37 @@
+name: ci
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v2
+        with:
+          go-version: ^1.17
+        id: go
+
+      - uses: actions/checkout@v2
+
+      - name: Get dependencies
+        run: go get -v -t -d ./...
+
+      - name: Build for Windows
+        run: GOOS=windows GOARCH=amd64 go build -o scoop-search-multisource.exe -v .
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/') && github.repository == 'plicit/scoop-search-multisource'
+        with:
+          files: |
+            scoop-search-multisource.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
