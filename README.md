@@ -9,7 +9,7 @@
 - customization through command line switches
 
 ## Example
-```sh
+```
 > scoops.exe "qr"
 ____________________
 #1 Searching  [buckets] c:\_scoop\buckets
@@ -55,7 +55,7 @@ MERGED RESULTS:
 
 ## Switches
 
-```sh
+```
 > scoops -help
 scoop-search-multisource.exe : Searches Scoop buckets: local, remote, zip, html
 
@@ -99,7 +99,7 @@ OPTIONS:
 
 ## Installation
 
-```sh
+```
 > scoop install https://github.com/plicit/scoop-search-multisource/scoop-manifest.json
 ```
 
@@ -109,7 +109,7 @@ If you use Powershell, then instead of using `scoop-search-multisource.exe <term
 
 Add this to your Powershell profile (usually located at `$PROFILE`)
 
-```ps1
+```
 PS > Invoke-Expression (&scoop-search-multisource --hook)
 ```
 
@@ -123,7 +123,7 @@ function scoop { if ($args[0] -eq "search") { scoop-search-multisource.exe @($ar
 
 `scoop-search-multisource` is about 47 times faster than the PowerShell `scoop search`.  Tested using [hyperfine](https://github.com/sharkdp/hyperfine):
 
-```ps1
+```
 PS > hyperfine --warmup 1 'scoop-search-multisource -source :active google' 'scoop-search-multisource -source :rasa google' 'scoop search google'
 Benchmark 1: scoop-search-multisource -source :active google
   Time (mean ± σ):     208.0 ms ±   7.1 ms    [User: 4.2 ms, System: 3.9 ms]
@@ -145,11 +145,11 @@ Summary
 
 ## Related projects
 
-[mertd/shovel-data](https://github.com/mertd/shovel-data) - A script that checks out all supported scoop buckets and collects the manifests in one searchable json file.
-[rasa/scoop-directory](https://github.com/rasa/scoop-directory) - Scoop directory updated daily
-[shilangyu/scoop-search](https://github.com/shilangyu/scoop-search) - Original scoop-search in Go
-[zhoujin7/crawl-scoop-directory](https://github.com/zhoujin7/crawl-scoop-directory) - creates an sqlite db from rasa
-[zhoujin7/scoop-search](https://github.com/zhoujin7/scoop-search) - web front end to sqlite db
+- [mertd/shovel-data](https://github.com/mertd/shovel-data) - A script that checks out all supported scoop buckets and collects the manifests in one searchable json file.
+- [rasa/scoop-directory](https://github.com/rasa/scoop-directory) - Scoop directory updated daily
+- [shilangyu/scoop-search](https://github.com/shilangyu/scoop-search) - Original scoop-search in Go
+- [zhoujin7/crawl-scoop-directory](https://github.com/zhoujin7/crawl-scoop-directory) - creates an sqlite db from rasa
+- [zhoujin7/scoop-search](https://github.com/zhoujin7/scoop-search) - web front end to sqlite db
 
 ## Provenance
 
