@@ -100,7 +100,7 @@ OPTIONS:
 ## Installation
 
 ```
-> scoop install https://github.com/plicit/scoop-search-multisource/scoop-manifest.json
+> scoop install "https://raw.githubusercontent.com/plicit/scoop-search-multisource/master/scoop-search-multisource.scoop.json"
 ```
 
 ## Powershell Hook
