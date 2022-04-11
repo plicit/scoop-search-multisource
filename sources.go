@@ -376,6 +376,7 @@ func loadBucketsFromHtmlReader(body io.ReadCloser) (buckets BucketMap, err error
 
 // Load a bucket by locally cloning a Git repo
 func cacheGitRepo(url string) (repoPath string) {
+
 	repoPath = filepath.Join(scoopCache("buckets"), net_url.QueryEscape(url))
 
 	var stdout bytes.Buffer
@@ -387,16 +388,19 @@ func cacheGitRepo(url string) (repoPath string) {
 		log.Println("Cloning repository: " + url)
 	} else {
 		cmdline = []string{"git", "pull"}
-		log.Println("Updating repository: " + url)
+		log.Println("Updating repository cache: " + repoPath)
 	}
 
 	cmd := exec.Command(cmdline[0], cmdline[1:]...)
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stdout // &stderr
+	cmd.Dir = repoPath
 	err = cmd.Run()
-	checkWith(err, stdout.String())
-
 	fmt.Println(stdout.String())
+
+	if err != nil {
+		fmt.Printf(colorize("error", "*** %s\nTrying to continue anyway..."), err)
+	}
 
 	return
 }
