@@ -23,6 +23,7 @@ var g_ColorMap = ColorMap{
 	"totals":             "light_cyan",
 	"divider":            "",
 	"debug":              "light_red",
+	"error":              "light_red",
 }
 
 //var g_defaultColorsArg = g_ColorMap.String()

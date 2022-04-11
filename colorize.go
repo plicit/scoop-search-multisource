@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"text/template"
+
 	//	"html/template"
 	"os"
 	"regexp"
@@ -93,9 +94,9 @@ func (stdio *Stdio) initConsole() {
 		// Unconditionally set the console mode back even on failure because SetConsoleMode
 		// remembers invalid bits on input handles.
 		windows.SetConsoleMode(stdio.in, stdio.inMode)
-	} else {
-		fmt.Printf("failed to get console mode for stdin: %v\n", err)
-	}
+	} //else {
+	//fmt.Printf("failed to get console mode for stdin: %v\n", err)
+	//}
 
 	stdio.out = windows.Handle(os.Stdout.Fd())
 	if err := windows.GetConsoleMode(stdio.out, &stdio.outMode); err == nil {
@@ -104,10 +105,10 @@ func (stdio *Stdio) initConsole() {
 		} else {
 			windows.SetConsoleMode(stdio.out, stdio.outMode)
 		}
-	} else {
-		//fmt.Printf("failed to get console mode for stdout: %v\n", err)
-		fmt.Fprintf(os.Stderr, "Not colorizing since redirected to a file\n")
-	}
+	} //else {
+	//fmt.Printf("failed to get console mode for stdout: %v\n", err)
+	//fmt.Fprintf(os.Stderr, "Not colorizing since redirected to a file\n")
+	//}
 
 	stdio.err = windows.Handle(os.Stderr.Fd())
 	if err := windows.GetConsoleMode(stdio.err, &stdio.errMode); err == nil {
@@ -116,9 +117,9 @@ func (stdio *Stdio) initConsole() {
 		} else {
 			windows.SetConsoleMode(stdio.err, stdio.errMode)
 		}
-	} else {
-		fmt.Printf("failed to get console mode for stderr: %v\n", err)
-	}
+	} //else {
+	//fmt.Printf("failed to get console mode for stderr: %v\n", err)
+	//}
 }
 
 var g_ColorizeTemplate = template.New("Colorization")

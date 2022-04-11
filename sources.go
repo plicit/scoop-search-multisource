@@ -66,7 +66,19 @@ func loadBucketsFrom(kind string, path string) (buckets BucketMap, err error) {
 
 // searches for term in given json manifest
 // this does NOT set app.name, since that is not in the json
-func loadAppFromManifest(json []byte) (app *AppInfo) {
+// https://github.com/ScoopInstaller/scoop/wiki/App-Manifests
+func loadAppFromManifest(manifestPath string, json []byte) (app *AppInfo) {
+	finalMsg := ""
+	defer func() { // catch if fastjson panics
+		// recover from panic if one occured. Set err to nil otherwise.
+		if recover() != nil {
+			app = nil
+			fmt.Printf(colorize("error", "*** Skipped BROKEN manifest: %s\n"), manifestPath)
+		} else if finalMsg != "" {
+			fmt.Printf(colorize("error", "*** Including BROKEN manifest (%s): %s\n"), finalMsg, manifestPath)
+		}
+	}()
+
 	app = &AppInfo{}
 
 	var parser fastjson.Parser
@@ -79,26 +91,39 @@ func loadAppFromManifest(json []byte) (app *AppInfo) {
 	var bins []string
 	bin := result.Get("bin") // can be: nil, string, [](string | []string)
 	if bin != nil {
-		const badManifestErrMsg = `Cannot parse "bin" attribute in a manifest. This should not happen. Please open an issue about it with steps to reproduce`
-
+		errMsg := `bad "bin"`
 		switch bin.Type() {
 		case fastjson.TypeString:
+			// "bin": "myprog.exe",
 			bins = append(bins, string(bin.GetStringBytes()))
 		case fastjson.TypeArray:
+			// "bin": [ "myprog.exe", [ "program.exe", "alias", "--arg1" ] ]
 			for _, stringOrArray := range bin.GetArray() {
 				switch stringOrArray.Type() {
-				case fastjson.TypeString:
+				case fastjson.TypeString: // "myprog.exe"
 					bins = append(bins, string(stringOrArray.GetStringBytes()))
-				case fastjson.TypeArray:
-					// check only first two, the rest are command flags
+				case fastjson.TypeArray: // [ "program.exe", "alias", "--arg1", "--arg2" ]
+					// check only the first two strings, the rest are command flags
 					stringArray := stringOrArray.GetArray()
-					bins = append(bins, string(stringArray[0].GetStringBytes()), string(stringArray[1].GetStringBytes()))
+					// caused panic when there was only one string:
+					//bins = append(bins, string(stringArray[0].GetStringBytes()), string(stringArray[1].GetStringBytes()))
+					count := 0
+					for _, item := range stringArray {
+						bins = append(bins, string(item.GetStringBytes()))
+						count += 1
+						// max of 2: exe and alias
+						if count >= 2 {
+							break
+						}
+					}
 				default:
-					log.Fatalln(badManifestErrMsg)
+					finalMsg = errMsg
+					//log.Fatalln(badManifestErrMsg)
 				}
 			}
 		default:
-			log.Fatalln(badManifestErrMsg)
+			finalMsg = errMsg
+			//log.Fatalln(badManifestErrMsg)
 		}
 	}
 
@@ -129,11 +154,12 @@ func loadAppListFromDir(path string) (apps AppList) {
 			continue
 		}
 
-		body, err := ioutil.ReadFile(filepath.Join(path, name))
+		filePath := filepath.Join(path, name)
+		body, err := ioutil.ReadFile(filePath)
 		check(err)
 
 		// parse relevant data from manifest
-		app := loadAppFromManifest(body)
+		app := loadAppFromManifest(filePath, body)
 		if app != nil {
 			app.name = name[:len(name)-5]
 			apps = append(apps, app)
@@ -207,7 +233,8 @@ func loadAppListFromZip(path string) (appList AppList) {
 			readCloser.Close()
 			check(err)
 
-			app := loadAppFromManifest(body)
+			filePath := fmt.Sprintf("%s:%s", path, innerPath)
+			app := loadAppFromManifest(filePath, body)
 			if app != nil {
 				_, filename := filepath.Split(innerPath)
 				app.name = filename[:len(filename)-5] // remove ".json"
@@ -404,7 +431,12 @@ func cacheGetUrl(cacheFilePath string, url string) (err error) {
 	f, err := os.Stat(cacheFilePath)
 	cache_exists := !os.IsNotExist(err)
 
-	if !cache_exists || g_CacheDuration < now.Sub(f.ModTime()) {
+	age := time.Duration(0)
+	if cache_exists {
+		age = now.Sub(f.ModTime())
+	}
+
+	if !cache_exists || g_CacheDuration < age {
 		fmt.Printf("Downloading: %s\n", url)
 		response, err := http.Get(url)
 		if err != nil { // default to cache
@@ -424,7 +456,7 @@ func cacheGetUrl(cacheFilePath string, url string) (err error) {
 		checkWith(err, "Couldn't write to cache file")
 
 	} else {
-		fmt.Printf(colorize("source.status", "using cache: %s\n"), cacheFilePath)
+		fmt.Printf(colorize("source.status", "using %s old cache: %s\n"), fmtDuration(age), cacheFilePath)
 	}
 
 	return

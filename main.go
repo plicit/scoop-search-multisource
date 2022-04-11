@@ -12,7 +12,7 @@ import (
 	//	"github.com/pkg/profile"
 )
 
-var version = "v0.1.20220223"
+var version = "v0.1.20220410"
 
 type SearchQuery struct {
 	pattern *regexp.Regexp
