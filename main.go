@@ -148,6 +148,7 @@ func getScoopHome() (res string) {
 		checkWith(err, "Could not determine home dir")
 		res += "\\scoop"
 	}
+	res = strings.ReplaceAll(res, "/", "\\")
 	return
 }
 

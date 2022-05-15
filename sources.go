@@ -45,6 +45,8 @@ func loadBucketsFrom(kind string, path string) (buckets BucketMap, err error) {
 				appList = loadAppListFromGitRepoUrl(path)
 			}
 		} else { // it's a local file
+			// normalize path separator
+			path = strings.ReplaceAll(path, "/", "\\")
 			switch {
 			case strings.HasSuffix(path, ".html") || strings.HasSuffix(path, ".htm"):
 				readCloser, err := os.Open(path)
