@@ -119,6 +119,26 @@ The hook is basically:
 function scoop { if ($args[0] -eq "search") { scoop-search-multisource.exe @($args | Select-Object -Skip 1) } else { scoop.ps1 @args } }
 ```
 
+## Avoiding Long Delays in Execution
+
+If you periodically get long delays when searching your active buckets, then it may be that Windows Defender (Antimalware Service Executable msmpeng.exe) is re-scanning them on-demand before allowing `scoops` to read them.
+
+To skip such security scanning, you could add your [active buckets directory](https://github.com/ScoopInstaller/Scoop/wiki/Scoop-Folder-Layout) as an ExclusionPath so that Windows Defender excludes it from scanning.  For example, this excludes the buckets in the default locations as well as if the SCOOP and SCOOP_GLOBAL vars are set:
+
+```ps1
+# Exclude your active buckets directories
+# default locations:
+Add-MpPreference -ExclusionPath "${env:ProgramData}\scoop\buckets", "${env:USERPROFILE}\scoop\buckets" -Force
+# OR if SCOOP and SCOOP_GLOBAL env variables are set:
+Add-MpPreference -ExclusionPath "${env:SCOOP}\buckets", "${env:SCOOP_GLOBAL}\buckets" -Force
+
+# View the current paths excluded
+# via powershell:
+$(Get-MpPreference).ExclusionPath
+# OR via cmd:
+reg query "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows Defender\Exclusions\Paths" /s /reg:64
+```
+
 ## Benchmarks
 
 `scoop-search-multisource` is about 47 times faster than the PowerShell `scoop search`.  Tested using [hyperfine](https://github.com/sharkdp/hyperfine):
