@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
 	"time"
 	// "encoding/json"
 )
@@ -67,4 +68,13 @@ func fmtDuration(dur time.Duration) string {
 	}
 	//if 0 < m {
 	return fmt.Sprintf("%dm", m) // minutes
+}
+
+func FirstPathThatExists(paths []string) string {
+	for _, path := range paths {
+		if _, err := os.Stat(path); err != nil { //!errors.Is(err, os.ErrNotExist) {
+			return path
+		}
+	}
+	return ""
 }

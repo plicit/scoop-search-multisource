@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -9,10 +10,12 @@ import (
 	"sort"
 	"strings"
 	"time"
+
 	//	"github.com/pkg/profile"
+	"github.com/valyala/fastjson"
 )
 
-var version = "v0.1.20220411"
+var version = "v0.1.20220728"
 
 type SearchQuery struct {
 	pattern *regexp.Regexp
@@ -59,7 +62,19 @@ type SearchState struct {
 	numAppMatches int
 }
 
+type ScoopConfig struct {
+	userHome   string
+	configHome string // $env:XDG_CONFIG_HOME, "$env:USERPROFILE\.config"
+	configFile string // "$configHome\scoop\config.json"
+	scoopDir   string // $env:SCOOP, (get_config 'rootPath'), "$env:USERPROFILE\scoop"
+	// Scoop global apps directory
+	globalDir       string // $env:SCOOP_GLOBAL, (get_config 'globalPath'), "$env:ProgramData\scoop"
+	cacheDir        string // $env:SCOOP_CACHE, (get_config 'cachePath'), "$scoopdir\cache"
+	namedSourceRefs map[string]SourceRef
+}
+
 var g_State = new(SearchState)
+var g_Config = new(ScoopConfig)
 
 // load and search (filter) the given source, returning filtered bucket matches and the total number of app matches in those buckets
 func (state *SearchState) SearchSource(src *SourceRef) (match *BucketsMatch, err error) {
@@ -138,17 +153,96 @@ func (state *SearchState) Run(args *parsedArgs) error {
 	return nil
 }
 
-// resolves the path to scoop folder
-func getScoopHome() (res string) {
-	if value, ok := os.LookupEnv("SCOOP"); ok {
-		res = value
+// resolves paths to scoop folders and loads config
+func loadScoopConfig() (err error) {
+	//configHome string // $env:XDG_CONFIG_HOME, "$env:USERPROFILE\.config"
+	//configFile string // "$configHome\scoop\config.json"
+	//scoopDir string // $env:SCOOP, (get_config 'rootPath'), "$env:USERPROFILE\scoop"
+	//// Scoop global apps directory
+	//globalDir string // $env:SCOOP_GLOBAL, (get_config 'globalPath'), "$env:ProgramData\scoop"
+	//cacheDir string // $env:SCOOP_CACHE, (get_config 'cachePath'), "$scoopdir\cache"
+
+	// Scoop root directory
+	// $scoopdir = $env:SCOOP, (get_config 'rootPath'), "$env:USERPROFILE\scoop" | Where-Object { -not [String]::IsNullOrEmpty($_) } | Select-Object -First 1
+	// FirstPathThatExists?
+
+	userHome, err := os.UserHomeDir()
+	checkWith(err, "Could not determine home dir")
+	g_Config.userHome = strings.ReplaceAll(userHome, "/", "\\")
+
+	// $configHome = $env:XDG_CONFIG_HOME, "$env:USERPROFILE\.config" | Select-Object -First 1
+	// $configFile = "$configHome\scoop\config.json"
+
+	if value, ok := os.LookupEnv("XDG_CONFIG_HOME"); ok {
+		g_Config.configHome = value
 	} else {
-		var err error
-		res, err = os.UserHomeDir()
-		checkWith(err, "Could not determine home dir")
-		res += "\\scoop"
+		g_Config.configHome = filepath.Join(g_Config.userHome, ".config")
 	}
-	res = strings.ReplaceAll(res, "/", "\\")
+	g_Config.configHome = strings.ReplaceAll(g_Config.configHome, "/", "\\")
+
+	//fmt.Println("*** configHome:", configHome)
+
+	// parse scoop config.json for rootPath
+	g_Config.configFile = filepath.Join(g_Config.configHome, "scoop", "config.json")
+	//fmt.Println("*** configFile:", configFile)
+
+	//{
+	//	"lastupdate": "2022-06-20T13:38:23.6926110-05:00",
+	//	"SCOOP_REPO": "https://github.com/ScoopInstaller/Scoop",
+	//	"SCOOP_BRANCH": "master"
+	//}
+	body, err := ioutil.ReadFile(g_Config.configFile)
+	if err == nil && len(body) > 0 {
+		var parser fastjson.Parser
+		js, _ := parser.ParseBytes(body)
+		g_Config.scoopDir = string(js.GetStringBytes("rootPath"))
+		g_Config.globalDir = string(js.GetStringBytes("globalPath"))
+		g_Config.cacheDir = string(js.GetStringBytes("cachePath"))
+	}
+
+	if value, ok := os.LookupEnv("SCOOP"); ok {
+		g_Config.scoopDir = value
+		//fmt.Println("*** SCOOP ENV!:", scoopHome)
+	}
+
+	// if it's not in the config file
+	if g_Config.scoopDir == "" {
+		g_Config.scoopDir = filepath.Join(g_Config.userHome, "scoop")
+		//fmt.Println("*** default userHome scoopHome:", scoopHome)
+	}
+
+	g_Config.scoopDir = strings.ReplaceAll(g_Config.scoopDir, "/", "\\")
+
+	//globalDir string // $env:SCOOP_GLOBAL, (get_config 'globalPath'), "$env:ProgramData\scoop"
+	globalDir := os.Getenv("SCOOP_GLOBAL")
+	if globalDir != "" {
+		g_Config.globalDir = globalDir
+	}
+	if g_Config.globalDir == "" {
+		g_Config.globalDir = filepath.Join(os.Getenv("ProgramData"), "scoop")
+	}
+
+	g_Config.globalDir = strings.ReplaceAll(g_Config.globalDir, "/", "\\")
+
+	//cacheDir string // $env:SCOOP_CACHE, (get_config 'cachePath'), "$scoopdir\cache"
+	cacheDir := os.Getenv("SCOOP_CACHE")
+	if cacheDir != "" {
+		g_Config.cacheDir = cacheDir
+	}
+	if g_Config.cacheDir == "" {
+		g_Config.cacheDir = filepath.Join(g_Config.scoopDir, "cache")
+	}
+
+	g_Config.cacheDir = strings.ReplaceAll(g_Config.cacheDir, "/", "\\")
+
+	g_Config.namedSourceRefs = map[string]SourceRef{}
+
+	g_Config.namedSourceRefs["active"] = SourceRef{"", "buckets", filepath.Join(g_Config.scoopDir, "buckets")}
+	g_Config.namedSourceRefs["rasa"] = SourceRef{"", "html", "https://rasa.github.io/scoop-directory/by-score.html"}
+	//	"rasa":   {"if0", "html", "https://rasa.github.io/scoop-directory/by-score.html"},
+
+	//fmt.Println(g_Config)
+	//os.Exit(1)
 	return
 }
 
@@ -162,6 +256,8 @@ func main() {
 	//defer profile.Start().Stop() // CPU profiling by default
 
 	defer timeTrack(time.Now(), "Search")
+
+	loadScoopConfig()
 
 	initColorize()
 
@@ -250,10 +346,10 @@ func filterBuckets(query *SearchQuery, buckets BucketMap) (match *BucketsMatch) 
 // uses %SCOOP%\apps\scoop\current\buckets.json to rename bucket source paths/urls to known names
 func renameBucketsToKnownNames(buckets BucketMap, prefix string) (res BucketMap) {
 	// we will remove any local buckets path prefix
-	bucketsPath := getScoopHome() + "\\buckets\\"
+	bucketsPath := g_Config.scoopDir + "\\buckets\\"
 
 	// load known bucket name:source from buckets.json
-	bucketsJsonFile := filepath.Join(getScoopHome(), "apps", "scoop", "current", "buckets.json")
+	bucketsJsonFile := filepath.Join(g_Config.scoopDir, "apps", "scoop", "current", "buckets.json")
 	bucketsByName := loadNameSourceMapFromJsonFile(bucketsJsonFile)
 	bucketsBySource := map[string]string{}
 
@@ -292,7 +388,11 @@ func printResults(buckets BucketMap, linelen int) (anyMatches bool) {
 	}
 	sort.Strings(sortedKeys)
 
-	installed := loadInstalledApps(getScoopHome() + "\\apps")
+	var userInstalled = NameSourceMap{}
+	loadInstalledApps(g_Config.scoopDir+"\\apps", &userInstalled)
+
+	var globalInstalled = NameSourceMap{}
+	loadInstalledApps(g_Config.globalDir+"\\apps", &globalInstalled)
 
 	// reserve additional space assuming each variable string has length 1. Will save time on initial allocations
 	var display strings.Builder
@@ -311,9 +411,12 @@ func printResults(buckets BucketMap, linelen int) (anyMatches bool) {
 			for _, m := range v {
 				prefix := "    "
 				color := "app.name"
-				if _, exists := installed[m.name]; exists {
+				if _, exists := userInstalled[m.name]; exists {
 					color = "app.name.installed"
 					prefix = " ** "
+				} else if _, exists := globalInstalled[m.name]; exists {
+					color = "app.name.installed"
+					prefix = " G* "
 				}
 
 				line = colorize(color, prefix+m.name)

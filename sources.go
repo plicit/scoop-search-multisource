@@ -197,17 +197,17 @@ func loadBucketsFromDir(bucketsPath string) (buckets BucketMap) {
 	return
 }
 
-func loadInstalledApps(appsPath string) (apps NameSourceMap) {
+func loadInstalledApps(appsPath string, apps *NameSourceMap) (err error) {
 	appFileInfos, err := ioutil.ReadDir(appsPath)
 	checkWith(err, "Apps folder does not exist")
 
-	apps = NameSourceMap{}
+	//apps = NameSourceMap{}
 	for _, appFileInfo := range appFileInfos {
 		name := appFileInfo.Name()
 		path := filepath.Join(appsPath, name)
-		apps[name] = path
+		(*apps)[name] = path
 	}
-	return
+	return nil
 }
 
 //=========================================================
@@ -425,7 +425,7 @@ var g_CacheDuration time.Duration = 24 * time.Hour
 //}
 
 func scoopCache(category string) (cachePath string) {
-	cachePath = filepath.Join(getScoopHome(), "cache", category)
+	cachePath = filepath.Join(g_Config.cacheDir, category)
 	checkWith(os.MkdirAll(cachePath, 0700), "Can't create cache directory: "+cachePath)
 	return
 }

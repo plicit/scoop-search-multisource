@@ -59,7 +59,7 @@ MERGED RESULTS:
 > scoops -help
 scoop-search-multisource.exe : Searches Scoop buckets: local, remote, zip, html
 
-VERSION: 0.1.20220411
+VERSION: 0.1.20220728
    HOME: https://github.com/plicit/scoop-search-multisource
 
   ALIAS: scoops.exe

@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -44,11 +43,6 @@ var g_SearchQueryOptionsFieldsStr = strings.Join(g_SearchQueryOptions.fields, ",
 
 var g_SourceNamedPathsRE = regexp.MustCompile(g_SourceOptions.path)
 var g_SourceFormatRE = regexp.MustCompile(`^(?:(?P<cond>` + g_SourceOptions.cond + `): )?(?:\[(?P<kind>` + g_SourceOptions.kind + `)\] )?(?P<path>.*)$`)
-var g_NamedSourceRefs = map[string]SourceRef{
-	"active": {"", "buckets", filepath.Join(getScoopHome(), "buckets")},
-	"rasa":   {"", "html", "https://rasa.github.io/scoop-directory/by-score.html"},
-	//	"rasa":   {"if0", "html", "https://rasa.github.io/scoop-directory/by-score.html"},
-}
 var g_SourcePatternHuman = `"<if0:> [<` + g_SourceOptions.kind + `>] <` + g_SourceOptions.path + ` or path/url>"`
 
 func (sources *SourceRefs) String() string {
@@ -74,7 +68,7 @@ GIVEN:   %s
 	// check for named path
 	m = g_SourceNamedPathsRE.FindStringSubmatch(source.path)
 	if m != nil {
-		src := g_NamedSourceRefs[source.path[1:]]
+		src := g_Config.namedSourceRefs[source.path[1:]]
 		// we keep the given condition, if any
 		source.kind = src.kind
 		source.path = src.path
@@ -194,7 +188,7 @@ EXAMPLES:
 
 	// --source: setup default sources
 	if args.sources == nil {
-		args.sources = SourceRefs{g_NamedSourceRefs["active"], g_NamedSourceRefs["rasa"]}
+		args.sources = SourceRefs{g_Config.namedSourceRefs["active"], g_Config.namedSourceRefs["rasa"]}
 	} // else if custom sources are on the command line, then the default fallback is not added
 
 	// <search-term> regexp parser
