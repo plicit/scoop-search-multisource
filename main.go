@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -15,27 +16,27 @@ import (
 	"github.com/valyala/fastjson"
 )
 
-var version = "v0.1.20220728"
+var g_Version = "v0.1.20220804"
 
 type SearchQuery struct {
-	pattern *regexp.Regexp
-	fields  []string
+	Pattern *regexp.Regexp
+	Fields  []string
 }
 
 type SourceRef struct {
-	cond string
-	kind string
-	path string
+	Cond string
+	Kind string
+	Path string
 }
 
 type SourceRefs []SourceRef
 
 type AppInfo struct {
-	name        string
-	version     string
-	description string
-	homepage    string
-	bins        []string
+	Name        string
+	Version     string
+	Description string
+	Homepage    string
+	Bins        []string
 }
 
 type AppList = []*AppInfo
@@ -43,8 +44,8 @@ type BucketMap = map[string]AppList
 type NameSourceMap = map[string]string
 
 type BucketsMatch struct {
-	buckets BucketMap
-	numApps int
+	Buckets BucketMap
+	NumApps int
 }
 
 func NewBucketsMatch() *BucketsMatch {
@@ -52,25 +53,25 @@ func NewBucketsMatch() *BucketsMatch {
 }
 
 type SearchState struct {
-	args               *parsedArgs
-	query              *SearchQuery
-	sources            SourceRefs
-	numSourcesSearched int
+	Args               *parsedArgs
+	Query              *SearchQuery
+	Sources            SourceRefs
+	NumSourcesSearched int
 
 	// Each Source has a corresponding BucketsMatch here:
-	matchList     []*BucketsMatch
-	numAppMatches int
+	MatchList     []*BucketsMatch
+	NumAppMatches int
 }
 
 type ScoopConfig struct {
-	userHome   string
-	configHome string // $env:XDG_CONFIG_HOME, "$env:USERPROFILE\.config"
-	configFile string // "$configHome\scoop\config.json"
-	scoopDir   string // $env:SCOOP, (get_config 'rootPath'), "$env:USERPROFILE\scoop"
+	UserHome   string
+	ConfigHome string // $env:XDG_CONFIG_HOME, "$env:USERPROFILE\.config"
+	ConfigFile string // "$configHome\scoop\config.json"
+	ScoopDir   string // $env:SCOOP, (get_config 'rootPath'), "$env:USERPROFILE\scoop"
 	// Scoop global apps directory
-	globalDir       string // $env:SCOOP_GLOBAL, (get_config 'globalPath'), "$env:ProgramData\scoop"
-	cacheDir        string // $env:SCOOP_CACHE, (get_config 'cachePath'), "$scoopdir\cache"
-	namedSourceRefs map[string]SourceRef
+	GlobalDir       string // $env:SCOOP_GLOBAL, (get_config 'globalPath'), "$env:ProgramData\scoop"
+	CacheDir        string // $env:SCOOP_CACHE, (get_config 'cachePath'), "$scoopdir\cache"
+	NamedSourceRefs map[string]SourceRef
 }
 
 var g_State = new(SearchState)
@@ -79,26 +80,26 @@ var g_Config = new(ScoopConfig)
 // load and search (filter) the given source, returning filtered bucket matches and the total number of app matches in those buckets
 func (state *SearchState) SearchSource(src *SourceRef) (match *BucketsMatch, err error) {
 	// load buckets based upon type of source
-	buckets, err := loadBucketsFrom(src.kind, src.path)
+	buckets, err := loadBucketsFrom(src.Kind, src.Path)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get buckets from source: %s", src)
 	}
 
-	match = filterBuckets(state.query, buckets)
-	match.buckets = renameBucketsToKnownNames(match.buckets, "/")
+	match = filterBuckets(state.Query, buckets)
+	match.Buckets = renameBucketsToKnownNames(match.Buckets, "/")
 
-	fmt.Printf(colorize("source.summary", "- %d apps matched in %d/%d buckets\n\n"), match.numApps, len(match.buckets), len(buckets))
+	fmt.Printf(colorize("source.summary", "- %d apps matched in %d/%d buckets\n\n"), match.NumApps, len(match.Buckets), len(buckets))
 
-	state.matchList = append(state.matchList, match)
-	state.numAppMatches += match.numApps
+	state.MatchList = append(state.MatchList, match)
+	state.NumAppMatches += match.NumApps
 
 	return match, nil
 }
 
 func (state *SearchState) Run(args *parsedArgs) error {
-	state.args = args
-	state.query = &args.query
-	state.sources = args.sources
+	state.Args = args
+	state.Query = &args.query
+	state.Sources = args.sources
 	// g_State.index = 0
 	// g_State.numAppMatches = 0
 	// g_State.matches
@@ -108,46 +109,59 @@ func (state *SearchState) Run(args *parsedArgs) error {
 	divider := colorize("divider", "____________________\n")
 
 	if args.debug {
-		fmt.Printf(colorize("debug", "  QUERY")+": %s\n", state.query.pattern)
-		fmt.Printf(colorize("debug", " FIELDS")+": %s\n", strings.Join(state.query.fields, ","))
-		fmt.Printf(colorize("debug", "SOURCES")+": %v\n", state.sources)
-		fmt.Printf(colorize("debug", " COLORS")+": %v\n", state.args.colors.StringAll(true))
+		fmt.Printf(colorize("debug", "VERSION")+": %s\n", g_Version)
+		fmt.Printf(colorize("debug", "  QUERY")+": %s\n", state.Query.Pattern)
+		fmt.Printf(colorize("debug", " FIELDS")+": %s\n", strings.Join(state.Query.Fields, ","))
+		fmt.Printf(colorize("debug", "SOURCES")+": %v\n", state.Sources)
+		fmt.Printf(colorize("debug", " COLORS")+": %v\n", state.Args.colors.StringAll(true))
+
+		if b, err := json.Marshal(g_Config); err == nil {
+			fmt.Printf(colorize("debug", " CONFIG")+": %s\n", string(b))
+		} else {
+			fmt.Println(err)
+		}
+
+		//v := reflect.ValueOf(s)
+		//typeOfS := v.Type()
+		//for i := 0; i < v.NumField(); i++ {
+		//	fmt.Printf("Field: %s\tValue: %v\n", typeOfS.Field(i).Name, v.Field(i).Interface())
+		//}
 	}
 
-	for index, src := range state.sources {
-		if src.cond == "if0" && state.numAppMatches > 0 {
+	for index, src := range state.Sources {
+		if src.Cond == "if0" && state.NumAppMatches > 0 {
 			continue
 		}
 
 		fmt.Print(divider)
-		fmt.Printf(colorize("source.header", "#%d Searching %s [%s] %s\n"), index+1, src.cond, src.kind, src.path)
+		fmt.Printf(colorize("source.header", "#%d Searching %s [%s] %s\n"), index+1, src.Cond, src.Kind, src.Path)
 
 		match, _ := state.SearchSource(&src)
-		state.numSourcesSearched += 1
+		state.NumSourcesSearched += 1
 		if !merge {
-			printResults(match.buckets, args.linelen)
+			printResults(match.Buckets, args.linelen)
 		}
 	}
 
 	// calculate the total number of buckets matching from each Source
 	numBuckets := 0
-	for _, match := range state.matchList {
-		numBuckets += len(match.buckets)
+	for _, match := range state.MatchList {
+		numBuckets += len(match.Buckets)
 	}
 
 	fmt.Print(divider)
-	fmt.Printf(colorize("totals", "TOTAL: %d apps matched in %d buckets from %d sources\n\n"), state.numAppMatches, numBuckets, state.numSourcesSearched)
+	fmt.Printf(colorize("totals", "TOTAL: %d apps matched in %d buckets from %d sources\n\n"), state.NumAppMatches, numBuckets, state.NumSourcesSearched)
 
 	if merge {
 		fmt.Printf("MERGED RESULTS:\n\n")
 		merged := NewBucketsMatch()
-		for _, match := range state.matchList {
-			for name, appList := range match.buckets {
-				merged.buckets[name] = appList
-				merged.numApps += len(appList)
+		for _, match := range state.MatchList {
+			for name, appList := range match.Buckets {
+				merged.Buckets[name] = appList
+				merged.NumApps += len(appList)
 			}
 		}
-		printResults(merged.buckets, args.linelen)
+		printResults(merged.Buckets, args.linelen)
 	}
 
 	return nil
@@ -168,22 +182,22 @@ func loadScoopConfig() (err error) {
 
 	userHome, err := os.UserHomeDir()
 	checkWith(err, "Could not determine home dir")
-	g_Config.userHome = strings.ReplaceAll(userHome, "/", "\\")
+	g_Config.UserHome = strings.ReplaceAll(userHome, "/", "\\")
 
 	// $configHome = $env:XDG_CONFIG_HOME, "$env:USERPROFILE\.config" | Select-Object -First 1
 	// $configFile = "$configHome\scoop\config.json"
 
 	if value, ok := os.LookupEnv("XDG_CONFIG_HOME"); ok {
-		g_Config.configHome = value
+		g_Config.ConfigHome = value
 	} else {
-		g_Config.configHome = filepath.Join(g_Config.userHome, ".config")
+		g_Config.ConfigHome = filepath.Join(g_Config.UserHome, ".config")
 	}
-	g_Config.configHome = strings.ReplaceAll(g_Config.configHome, "/", "\\")
+	g_Config.ConfigHome = strings.ReplaceAll(g_Config.ConfigHome, "/", "\\")
 
 	//fmt.Println("*** configHome:", configHome)
 
 	// parse scoop config.json for rootPath
-	g_Config.configFile = filepath.Join(g_Config.configHome, "scoop", "config.json")
+	g_Config.ConfigFile = filepath.Join(g_Config.ConfigHome, "scoop", "config.json")
 	//fmt.Println("*** configFile:", configFile)
 
 	//{
@@ -191,54 +205,57 @@ func loadScoopConfig() (err error) {
 	//	"SCOOP_REPO": "https://github.com/ScoopInstaller/Scoop",
 	//	"SCOOP_BRANCH": "master"
 	//}
-	body, err := ioutil.ReadFile(g_Config.configFile)
+	body, err := ioutil.ReadFile(g_Config.ConfigFile)
 	if err == nil && len(body) > 0 {
 		var parser fastjson.Parser
 		js, _ := parser.ParseBytes(body)
-		g_Config.scoopDir = string(js.GetStringBytes("rootPath"))
-		g_Config.globalDir = string(js.GetStringBytes("globalPath"))
-		g_Config.cacheDir = string(js.GetStringBytes("cachePath"))
+		g_Config.ScoopDir = string(js.GetStringBytes("rootPath"))
+		g_Config.GlobalDir = string(js.GetStringBytes("globalPath"))
+		g_Config.CacheDir = string(js.GetStringBytes("cachePath"))
 	}
 
+	//scoopDir string // $env:SCOOP, (get_config 'rootPath'), "$env:USERPROFILE\scoop"
+	// env overwrites config
 	if value, ok := os.LookupEnv("SCOOP"); ok {
-		g_Config.scoopDir = value
+		g_Config.ScoopDir = value
 		//fmt.Println("*** SCOOP ENV!:", scoopHome)
 	}
 
-	// if it's not in the config file
-	if g_Config.scoopDir == "" {
-		g_Config.scoopDir = filepath.Join(g_Config.userHome, "scoop")
+	// if it's not in the env or config file
+	if g_Config.ScoopDir == "" {
+		g_Config.ScoopDir = filepath.Join(g_Config.UserHome, "scoop")
 		//fmt.Println("*** default userHome scoopHome:", scoopHome)
 	}
 
-	g_Config.scoopDir = strings.ReplaceAll(g_Config.scoopDir, "/", "\\")
+	g_Config.ScoopDir = strings.ReplaceAll(g_Config.ScoopDir, "/", "\\")
 
 	//globalDir string // $env:SCOOP_GLOBAL, (get_config 'globalPath'), "$env:ProgramData\scoop"
 	globalDir := os.Getenv("SCOOP_GLOBAL")
 	if globalDir != "" {
-		g_Config.globalDir = globalDir
+		g_Config.GlobalDir = globalDir
 	}
-	if g_Config.globalDir == "" {
-		g_Config.globalDir = filepath.Join(os.Getenv("ProgramData"), "scoop")
+	if g_Config.GlobalDir == "" {
+		g_Config.GlobalDir = filepath.Join(os.Getenv("ProgramData"), "scoop")
 	}
 
-	g_Config.globalDir = strings.ReplaceAll(g_Config.globalDir, "/", "\\")
+	g_Config.GlobalDir = strings.ReplaceAll(g_Config.GlobalDir, "/", "\\")
 
 	//cacheDir string // $env:SCOOP_CACHE, (get_config 'cachePath'), "$scoopdir\cache"
 	cacheDir := os.Getenv("SCOOP_CACHE")
 	if cacheDir != "" {
-		g_Config.cacheDir = cacheDir
+		g_Config.CacheDir = cacheDir
 	}
-	if g_Config.cacheDir == "" {
-		g_Config.cacheDir = filepath.Join(g_Config.scoopDir, "cache")
+	if g_Config.CacheDir == "" {
+		g_Config.CacheDir = filepath.Join(g_Config.ScoopDir, "cache")
 	}
 
-	g_Config.cacheDir = strings.ReplaceAll(g_Config.cacheDir, "/", "\\")
+	g_Config.CacheDir = strings.ReplaceAll(g_Config.CacheDir, "/", "\\")
 
-	g_Config.namedSourceRefs = map[string]SourceRef{}
+	g_Config.NamedSourceRefs = map[string]SourceRef{}
 
-	g_Config.namedSourceRefs["active"] = SourceRef{"", "buckets", filepath.Join(g_Config.scoopDir, "buckets")}
-	g_Config.namedSourceRefs["rasa"] = SourceRef{"", "html", "https://rasa.github.io/scoop-directory/by-score.html"}
+	// must be after loading config
+	g_Config.NamedSourceRefs["active"] = SourceRef{"", "buckets", filepath.Join(g_Config.ScoopDir, "buckets")}
+	g_Config.NamedSourceRefs["rasa"] = SourceRef{"", "html", "https://rasa.github.io/scoop-directory/by-score.html"}
 	//	"rasa":   {"if0", "html", "https://rasa.github.io/scoop-directory/by-score.html"},
 
 	//fmt.Println(g_Config)
@@ -257,6 +274,7 @@ func main() {
 
 	defer timeTrack(time.Now(), "Search")
 
+	// must be before parsing the command line due to g_Config.NamedSourceRefs
 	loadScoopConfig()
 
 	initColorize()
@@ -266,7 +284,7 @@ func main() {
 
 	// don't allow an empty query
 	// if the user wants all apps, they can supply a dot or empty string "" which will have "(?i)" prepended to it and skip this
-	if args.query.pattern.String() == "" {
+	if args.query.Pattern.String() == "" {
 		myUsage()
 	} else {
 		// merge semantic color names into color values
@@ -275,7 +293,7 @@ func main() {
 	}
 
 	// exit with status code
-	if g_State.numAppMatches == 0 {
+	if g_State.NumAppMatches == 0 {
 		os.Exit(1)
 	}
 }
@@ -284,26 +302,26 @@ func main() {
 func filterApp(query *SearchQuery, app *AppInfo) bool {
 	found := false
 	//	if strings.Contains(strings.ToLower(app.name), opt) {
-	for _, field := range query.fields {
+	for _, field := range query.Fields {
 		switch field {
 		case "name":
-			if query.pattern.MatchString(app.name) {
-				app.bins = nil // ignore bin if name matches
+			if query.Pattern.MatchString(app.Name) {
+				app.Bins = nil // ignore bin if name matches
 				found = true
 			}
 		case "bins":
 			var bins []string
-			for _, bin := range app.bins {
+			for _, bin := range app.Bins {
 				bin = filepath.Base(bin)
 				//			if strings.Contains(strings.ToLower(strings.TrimSuffix(bin, filepath.Ext(bin))), opt) {
-				if query.pattern.MatchString(strings.TrimSuffix(bin, filepath.Ext(bin))) {
+				if query.Pattern.MatchString(strings.TrimSuffix(bin, filepath.Ext(bin))) {
 					bins = append(bins, bin)
 					found = true
 				}
 			}
-			app.bins = bins
+			app.Bins = bins
 		case "description":
-			if query.pattern.MatchString(app.description) {
+			if query.Pattern.MatchString(app.Description) {
 				found = true
 			}
 		}
@@ -322,7 +340,7 @@ func filterAppList(query *SearchQuery, apps AppList) (matches AppList) {
 	// sort the apps by name
 	sort.SliceStable(matches, func(i, j int) bool {
 		// case insensitive comparison where hyphens are ignored
-		return strings.ToLower(strings.ReplaceAll(matches[i].name, "-", "")) <= strings.ToLower(strings.ReplaceAll(matches[j].name, "-", ""))
+		return strings.ToLower(strings.ReplaceAll(matches[i].Name, "-", "")) <= strings.ToLower(strings.ReplaceAll(matches[j].Name, "-", ""))
 	})
 
 	return
@@ -331,13 +349,13 @@ func filterAppList(query *SearchQuery, apps AppList) (matches AppList) {
 // uses query to filter buckets into a new BucketMap of matches
 func filterBuckets(query *SearchQuery, buckets BucketMap) (match *BucketsMatch) {
 	match = NewBucketsMatch()
-	match.numApps = 0
-	match.buckets = BucketMap{}
+	match.NumApps = 0
+	match.Buckets = BucketMap{}
 	for source, apps := range buckets {
 		apps = filterAppList(query, apps)
 		if len(apps) > 0 {
-			match.buckets[source] = apps
-			match.numApps += len(apps)
+			match.Buckets[source] = apps
+			match.NumApps += len(apps)
 		}
 	}
 	return
@@ -346,10 +364,10 @@ func filterBuckets(query *SearchQuery, buckets BucketMap) (match *BucketsMatch) 
 // uses %SCOOP%\apps\scoop\current\buckets.json to rename bucket source paths/urls to known names
 func renameBucketsToKnownNames(buckets BucketMap, prefix string) (res BucketMap) {
 	// we will remove any local buckets path prefix
-	bucketsPath := g_Config.scoopDir + "\\buckets\\"
+	bucketsPath := g_Config.ScoopDir + "\\buckets\\"
 
 	// load known bucket name:source from buckets.json
-	bucketsJsonFile := filepath.Join(g_Config.scoopDir, "apps", "scoop", "current", "buckets.json")
+	bucketsJsonFile := filepath.Join(g_Config.ScoopDir, "apps", "scoop", "current", "buckets.json")
 	bucketsByName := loadNameSourceMapFromJsonFile(bucketsJsonFile)
 	bucketsBySource := map[string]string{}
 
@@ -389,10 +407,14 @@ func printResults(buckets BucketMap, linelen int) (anyMatches bool) {
 	sort.Strings(sortedKeys)
 
 	var userInstalled = NameSourceMap{}
-	loadInstalledApps(g_Config.scoopDir+"\\apps", &userInstalled)
+	err := loadInstalledApps(g_Config.ScoopDir+"\\apps", &userInstalled)
+	if err != nil {
+		log.Println("loadInstalledApps: Apps path does not exist: ", err)
+	}
 
 	var globalInstalled = NameSourceMap{}
-	loadInstalledApps(g_Config.globalDir+"\\apps", &globalInstalled)
+	loadInstalledApps(g_Config.GlobalDir+"\\apps", &globalInstalled)
+	// ignore if global apps path doesn't exist
 
 	// reserve additional space assuming each variable string has length 1. Will save time on initial allocations
 	var display strings.Builder
@@ -411,29 +433,29 @@ func printResults(buckets BucketMap, linelen int) (anyMatches bool) {
 			for _, m := range v {
 				prefix := "    "
 				color := "app.name"
-				if _, exists := userInstalled[m.name]; exists {
+				if _, exists := userInstalled[m.Name]; exists {
 					color = "app.name.installed"
 					prefix = " ** "
-				} else if _, exists := globalInstalled[m.name]; exists {
+				} else if _, exists := globalInstalled[m.Name]; exists {
 					color = "app.name.installed"
 					prefix = " G* "
 				}
 
-				line = colorize(color, prefix+m.name)
-				line += " (" + colorize("app.version", m.version) + ")"
+				line = colorize(color, prefix+m.Name)
+				line += " (" + colorize("app.version", m.Version) + ")"
 
-				if len(m.bins) != 0 {
+				if len(m.Bins) != 0 {
 					// display.WriteString(" --> includes '")
 					// bins := strings.Join(m.bins, ",")
-					bins := m.bins[0]
+					bins := m.Bins[0]
 					line += " [" + bins + "]"
 				}
 				display.WriteString(line)
 
 				remainder := MaxInt(0, linelen-len(line)-2)
-				if len(m.description) != 0 && remainder > 0 {
+				if len(m.Description) != 0 && remainder > 0 {
 					display.WriteString(": ")
-					display.WriteString(colorize("app.description", m.description[:MinInt(remainder, len(m.description))]))
+					display.WriteString(colorize("app.description", m.Description[:MinInt(remainder, len(m.Description))]))
 				}
 				display.WriteString("\n")
 			}

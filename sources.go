@@ -129,10 +129,10 @@ func loadAppFromManifest(manifestPath string, json []byte) (app *AppInfo) {
 		}
 	}
 
-	app.version = version
-	app.description = description
-	app.homepage = homepage
-	app.bins = bins
+	app.Version = version
+	app.Description = description
+	app.Homepage = homepage
+	app.Bins = bins
 	//app.loaded = true
 
 	return app
@@ -163,7 +163,7 @@ func loadAppListFromDir(path string) (apps AppList) {
 		// parse relevant data from manifest
 		app := loadAppFromManifest(filePath, body)
 		if app != nil {
-			app.name = name[:len(name)-5]
+			app.Name = name[:len(name)-5]
 			apps = append(apps, app)
 		}
 	}
@@ -199,7 +199,9 @@ func loadBucketsFromDir(bucketsPath string) (buckets BucketMap) {
 
 func loadInstalledApps(appsPath string, apps *NameSourceMap) (err error) {
 	appFileInfos, err := ioutil.ReadDir(appsPath)
-	checkWith(err, "Apps folder does not exist")
+	if err != nil {
+		return err
+	}
 
 	//apps = NameSourceMap{}
 	for _, appFileInfo := range appFileInfos {
@@ -239,7 +241,7 @@ func loadAppListFromZip(path string) (appList AppList) {
 			app := loadAppFromManifest(filePath, body)
 			if app != nil {
 				_, filename := filepath.Split(innerPath)
-				app.name = filename[:len(filename)-5] // remove ".json"
+				app.Name = filename[:len(filename)-5] // remove ".json"
 				appList = append(appList, app)
 			}
 		}
@@ -358,9 +360,9 @@ func loadBucketsFromHtmlReader(body io.ReadCloser) (buckets BucketMap, err error
 
 		for _, row := range rows {
 			app := AppInfo{}
-			app.name = strings.TrimSpace(row[namei])
-			app.version = strings.TrimSpace(row[versioni])
-			app.description = strings.TrimSpace(row[descriptioni])
+			app.Name = strings.TrimSpace(row[namei])
+			app.Version = strings.TrimSpace(row[versioni])
+			app.Description = strings.TrimSpace(row[descriptioni])
 			//fmt.Printf("app=%#v\n", app)
 			apps = append(apps, &app)
 
@@ -425,7 +427,7 @@ var g_CacheDuration time.Duration = 24 * time.Hour
 //}
 
 func scoopCache(category string) (cachePath string) {
-	cachePath = filepath.Join(g_Config.cacheDir, category)
+	cachePath = filepath.Join(g_Config.CacheDir, category)
 	checkWith(os.MkdirAll(cachePath, 0700), "Can't create cache directory: "+cachePath)
 	return
 }

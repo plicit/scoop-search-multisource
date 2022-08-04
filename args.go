@@ -29,21 +29,21 @@ var g_ColorMap = ColorMap{
 
 // Parses --source type:path
 var g_SourceOptions = SourceRef{
-	cond: "if0",
-	kind: "bucket|buckets|html",
-	path: ":active|:rasa",
+	Cond: "if0",
+	Kind: "bucket|buckets|html",
+	Path: ":active|:rasa",
 }
 
 var g_SearchQueryOptions = SearchQuery{
-	pattern: regexp.MustCompile("(?i)"),
-	fields:  []string{"name", "bins", "description"},
+	Pattern: regexp.MustCompile("(?i)"),
+	Fields:  []string{"name", "bins", "description"},
 }
 
-var g_SearchQueryOptionsFieldsStr = strings.Join(g_SearchQueryOptions.fields, ",")
+var g_SearchQueryOptionsFieldsStr = strings.Join(g_SearchQueryOptions.Fields, ",")
 
-var g_SourceNamedPathsRE = regexp.MustCompile(g_SourceOptions.path)
-var g_SourceFormatRE = regexp.MustCompile(`^(?:(?P<cond>` + g_SourceOptions.cond + `): )?(?:\[(?P<kind>` + g_SourceOptions.kind + `)\] )?(?P<path>.*)$`)
-var g_SourcePatternHuman = `"<if0:> [<` + g_SourceOptions.kind + `>] <` + g_SourceOptions.path + ` or path/url>"`
+var g_SourceNamedPathsRE = regexp.MustCompile(g_SourceOptions.Path)
+var g_SourceFormatRE = regexp.MustCompile(`^(?:(?P<cond>` + g_SourceOptions.Cond + `): )?(?:\[(?P<kind>` + g_SourceOptions.Kind + `)\] )?(?P<path>.*)$`)
+var g_SourcePatternHuman = `"<if0:> [<` + g_SourceOptions.Kind + `>] <` + g_SourceOptions.Path + ` or path/url>"`
 
 func (sources *SourceRefs) String() string {
 	return fmt.Sprintf("%v", *sources)
@@ -61,17 +61,17 @@ GIVEN:   %s
 `, value)
 	}
 
-	source.cond = m[1]
-	source.kind = m[2]
-	source.path = m[3]
+	source.Cond = m[1]
+	source.Kind = m[2]
+	source.Path = m[3]
 
 	// check for named path
-	m = g_SourceNamedPathsRE.FindStringSubmatch(source.path)
+	m = g_SourceNamedPathsRE.FindStringSubmatch(source.Path)
 	if m != nil {
-		src := g_Config.namedSourceRefs[source.path[1:]]
+		src := g_Config.NamedSourceRefs[source.Path[1:]]
 		// we keep the given condition, if any
-		source.kind = src.kind
-		source.path = src.path
+		source.Kind = src.Kind
+		source.Path = src.Path
 	}
 	*sources = append(*sources, source)
 
@@ -133,7 +133,7 @@ func myUsage() {
 	// os.Args[0]
 	fmt.Print(colorize("light_cyan", "scoop-search-multisource.exe : Searches Scoop buckets: local, remote, zip, html") + `
 
-` + colorize("yellow", "VERSION") + `: ` + version + `
+` + colorize("yellow", "VERSION") + `: ` + g_Version + `
 ` + colorize("yellow", "   HOME") + `: https://github.com/plicit/scoop-search-multisource
 
 ` + colorize("yellow", "  ALIAS") + `: scoops.exe
@@ -188,7 +188,7 @@ EXAMPLES:
 
 	// --source: setup default sources
 	if args.sources == nil {
-		args.sources = SourceRefs{g_Config.namedSourceRefs["active"], g_Config.namedSourceRefs["rasa"]}
+		args.sources = SourceRefs{g_Config.NamedSourceRefs["active"], g_Config.NamedSourceRefs["rasa"]}
 	} // else if custom sources are on the command line, then the default fallback is not added
 
 	// <search-term> regexp parser
@@ -204,7 +204,7 @@ EXAMPLES:
 	checkWith(err, "Failed to parse search term regexp")
 
 	// <search-term> and --fields
-	args.query = SearchQuery{pattern: re_Query, fields: strings.Split(args.fields, ",")}
+	args.query = SearchQuery{Pattern: re_Query, Fields: strings.Split(args.fields, ",")}
 
 	return
 }
