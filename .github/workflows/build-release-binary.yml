@@ -7,8 +7,8 @@ on:
     tags:
       - "v*.*.*"
     branches: [master]
-  pull_request:
-    branches: [master]
+#  pull_request:
+#    branches: [master]
 
 jobs:
   build:
@@ -23,7 +23,7 @@ jobs:
       
     - name: Dump GitHub context
       env:
-        GITHUB_CONTEXT: ${{ toJson(github) }}
+        GITHUB_CONTEXT: ${{ toJSON(github) }}
       run: echo "$GITHUB_CONTEXT"
       
     - run: git version
@@ -43,7 +43,7 @@ jobs:
         ref: master
         
     - name: Go get dependencies
-        run: go get -v -t -d ./...
+      run: go get -v -t -d ./...
 
     - name: Go build for Win_x64
       run: |
