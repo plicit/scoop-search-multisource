@@ -44,13 +44,10 @@ jobs:
         
     - name: Go get dependencies
       run: go get -v -t -d ./...
-
+      
     - name: Go build for Win_x64
       run: |
         go version
-#        cd src
-#        go mod init ${GITHUB_REPOSITORY}
-#        go mod tidy
         GOOS=windows GOARCH=amd64 go build -v -o scoop-search-multisource.exe .
 
     # release
