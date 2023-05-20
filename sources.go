@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	net_url "net/url"
@@ -145,7 +144,7 @@ func loadAppListFromDir(path string) (apps AppList) {
 		path = subBucketPath
 	}
 
-	fileInfos, err := ioutil.ReadDir(path)
+	fileInfos, err := os.ReadDir(path)
 	check(err)
 
 	for _, fileInfo := range fileInfos {
@@ -157,7 +156,7 @@ func loadAppListFromDir(path string) (apps AppList) {
 		}
 
 		filePath := filepath.Join(path, name)
-		body, err := ioutil.ReadFile(filePath)
+		body, err := os.ReadFile(filePath)
 		check(err)
 
 		// parse relevant data from manifest
@@ -172,16 +171,16 @@ func loadAppListFromDir(path string) (apps AppList) {
 }
 
 func loadBucketsFromDir(bucketsPath string) (buckets BucketMap) {
-	bucketFileInfos, err := ioutil.ReadDir(bucketsPath)
+	bucketDirEntries, err := os.ReadDir(bucketsPath)
 	checkWith(err, "Buckets folder does not exist")
 
 	var mutex sync.Mutex
 	var wg sync.WaitGroup
 
 	buckets = BucketMap{}
-	for _, bucketFileInfo := range bucketFileInfos {
+	for _, bucketDirEntry := range bucketDirEntries {
 		wg.Add(1)
-		go func(file os.FileInfo) {
+		go func(file os.DirEntry) {
 			bucketName := file.Name()
 			bucketPath := filepath.Join(bucketsPath, bucketName)
 			appList := loadAppListFromDir(bucketPath)
@@ -191,14 +190,14 @@ func loadBucketsFromDir(bucketsPath string) (buckets BucketMap) {
 			mutex.Unlock()
 
 			wg.Done()
-		}(bucketFileInfo)
+		}(bucketDirEntry)
 	}
 	wg.Wait()
 	return
 }
 
 func loadInstalledApps(appsPath string, apps *NameSourceMap) (err error) {
-	appFileInfos, err := ioutil.ReadDir(appsPath)
+	appFileInfos, err := os.ReadDir(appsPath)
 	if err != nil {
 		return err
 	}
@@ -233,7 +232,7 @@ func loadAppListFromZip(path string) (appList AppList) {
 			// uncompress file body
 			readCloser, err := file.Open()
 			check(err)
-			body, err := ioutil.ReadAll(readCloser)
+			body, err := io.ReadAll(readCloser)
 			readCloser.Close()
 			check(err)
 
@@ -427,7 +426,7 @@ var g_CacheDuration time.Duration = 24 * time.Hour
 //}
 
 func scoopCache(category string) (cachePath string) {
-	cachePath = filepath.Join(g_Config.CacheDir, category)
+	cachePath = filepath.Join(g_Config.ScoopCacheDir, category)
 	checkWith(os.MkdirAll(cachePath, 0700), "Can't create cache directory: "+cachePath)
 	return
 }
@@ -476,7 +475,7 @@ func cacheGetUrl(cacheFilePath string, url string) (err error) {
 
 // loads a buckets.json file into a map[name]sourceUrl
 func loadNameSourceMapFromJsonFile(path string) (res NameSourceMap) {
-	raw, err := ioutil.ReadFile(path)
+	raw, err := os.ReadFile(path)
 	check(err)
 	res = loadNameSourceMapFromJson(raw)
 	return

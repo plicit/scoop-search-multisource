@@ -117,7 +117,7 @@ func (colors *ColorMap) Set(value string) error {
 	return err
 }
 
-type parsedArgs struct {
+type ParsedArgs struct {
 	query   SearchQuery
 	sources SourceRefs
 	fields  string
@@ -149,8 +149,8 @@ func myUsage() {
 	flag.PrintDefaults()
 }
 
-func parseArgs() (args *parsedArgs) {
-	args = &parsedArgs{}
+func parseArgs() (args *ParsedArgs) {
+	args = &ParsedArgs{}
 	args.colors = &g_ColorMap
 
 	flag.Usage = myUsage

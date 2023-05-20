@@ -78,3 +78,14 @@ func FirstPathThatExists(paths []string) string {
 	}
 	return ""
 }
+
+//type StrSlice []string
+//
+//func (list StrSlice) Contains(a string) bool {
+//    for _, b := range list {
+//        if b == a {
+//            return true
+//        }
+//    }
+//    return false
+//}

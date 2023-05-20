@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -12,11 +11,17 @@ import (
 	"strings"
 	"time"
 
-	//	"github.com/pkg/profile"
+	"golang.org/x/exp/slices"
+
 	"github.com/valyala/fastjson"
+	////"github.com/pkg/profile"
+	//"github.com/mmcloughlin/profile"
+	//_ "github.com/mattn/go-sqlite3"
+	//_ "github.com/pocketbase/dbx"
+	// _ "github.com/mutecomm/go-sqlcipher/v4"
 )
 
-var g_Version = "v0.1.20220804"
+var g_Version = "v0.1.20230520"
 
 type SearchQuery struct {
 	Pattern *regexp.Regexp
@@ -53,7 +58,7 @@ func NewBucketsMatch() *BucketsMatch {
 }
 
 type SearchState struct {
-	Args               *parsedArgs
+	Args               *ParsedArgs
 	Query              *SearchQuery
 	Sources            SourceRefs
 	NumSourcesSearched int
@@ -64,16 +69,17 @@ type SearchState struct {
 }
 
 type ScoopConfig struct {
-	UserHome   string
-	ConfigHome string // $env:XDG_CONFIG_HOME, "$env:USERPROFILE\.config"
-	ConfigFile string // "$configHome\scoop\config.json"
-	ScoopDir   string // $env:SCOOP, (get_config 'rootPath'), "$env:USERPROFILE\scoop"
+	UserHome        string
+	ConfigHome      string // $env:XDG_CONFIG_HOME, "$env:USERPROFILE\.config"
+	ScoopConfigFile string // "$configHome\scoop\config.json"
+	ScoopDir        string // $env:SCOOP, (get_config 'root_path'), "$env:USERPROFILE\scoop"
 	// Scoop global apps directory
-	GlobalDir       string // $env:SCOOP_GLOBAL, (get_config 'globalPath'), "$env:ProgramData\scoop"
-	CacheDir        string // $env:SCOOP_CACHE, (get_config 'cachePath'), "$scoopdir\cache"
+	ScoopGlobalDir  string // $env:SCOOP_GLOBAL, (get_config 'globalPath'), "$env:ProgramData\scoop"
+	ScoopCacheDir   string // $env:SCOOP_CACHE, (get_config 'cachePath'), "$scoopdir\cache"
 	NamedSourceRefs map[string]SourceRef
 }
 
+var DEBUG bool
 var g_State = new(SearchState)
 var g_Config = new(ScoopConfig)
 
@@ -96,7 +102,7 @@ func (state *SearchState) SearchSource(src *SourceRef) (match *BucketsMatch, err
 	return match, nil
 }
 
-func (state *SearchState) Run(args *parsedArgs) error {
+func (state *SearchState) Run(args *ParsedArgs) error {
 	state.Args = args
 	state.Query = &args.query
 	state.Sources = args.sources
@@ -108,7 +114,7 @@ func (state *SearchState) Run(args *parsedArgs) error {
 
 	divider := colorize("divider", "____________________\n")
 
-	if args.debug {
+	if DEBUG {
 		fmt.Printf(colorize("debug", "VERSION")+": %s\n", g_Version)
 		fmt.Printf(colorize("debug", "  QUERY")+": %s\n", state.Query.Pattern)
 		fmt.Printf(colorize("debug", " FIELDS")+": %s\n", strings.Join(state.Query.Fields, ","))
@@ -167,21 +173,31 @@ func (state *SearchState) Run(args *parsedArgs) error {
 	return nil
 }
 
+//func debug(arg ...interface{}) {
+//	if DEBUG {
+//		fmt.Println(arg...) // forward it here
+//	}
+//}
+
 // resolves paths to scoop folders and loads config
 func loadScoopConfig() (err error) {
+	// %SCOOP%\apps\scoop\current\lib\core.ps1
+
 	//configHome string // $env:XDG_CONFIG_HOME, "$env:USERPROFILE\.config"
 	//configFile string // "$configHome\scoop\config.json"
-	//scoopDir string // $env:SCOOP, (get_config 'rootPath'), "$env:USERPROFILE\scoop"
+	//scoopDir string // $env:SCOOP, (get_config 'root_path'), "$env:USERPROFILE\scoop"
 	//// Scoop global apps directory
 	//globalDir string // $env:SCOOP_GLOBAL, (get_config 'globalPath'), "$env:ProgramData\scoop"
 	//cacheDir string // $env:SCOOP_CACHE, (get_config 'cachePath'), "$scoopdir\cache"
 
 	// Scoop root directory
-	// $scoopdir = $env:SCOOP, (get_config 'rootPath'), "$env:USERPROFILE\scoop" | Where-Object { -not [String]::IsNullOrEmpty($_) } | Select-Object -First 1
+	// $scoopdir = $env:SCOOP, (get_config 'root_path'), "$env:USERPROFILE\scoop" | Where-Object { -not [String]::IsNullOrEmpty($_) } | Select-Object -First 1
 	// FirstPathThatExists?
 
+	//g_Config.ConfigFrom := make([]string, 0)
+
 	userHome, err := os.UserHomeDir()
-	checkWith(err, "Could not determine home dir")
+	checkWith(err, "Could not determine user's home dir")
 	g_Config.UserHome = strings.ReplaceAll(userHome, "/", "\\")
 
 	// $configHome = $env:XDG_CONFIG_HOME, "$env:USERPROFILE\.config" | Select-Object -First 1
@@ -189,15 +205,21 @@ func loadScoopConfig() (err error) {
 
 	if value, ok := os.LookupEnv("XDG_CONFIG_HOME"); ok {
 		g_Config.ConfigHome = value
+		//		if DEBUG {
+		//			fmt.Printf("$env:XDG_CONFIG_HOME=%s\n", g_Config.ConfigHome)
+		//		}
 	} else {
 		g_Config.ConfigHome = filepath.Join(g_Config.UserHome, ".config")
+		//		if DEBUG {
+		//			fmt.Printf("$env:USERPROFILE=%s\n", g_Config.ConfigHome)
+		//		}
 	}
 	g_Config.ConfigHome = strings.ReplaceAll(g_Config.ConfigHome, "/", "\\")
 
 	//fmt.Println("*** configHome:", configHome)
 
-	// parse scoop config.json for rootPath
-	g_Config.ConfigFile = filepath.Join(g_Config.ConfigHome, "scoop", "config.json")
+	// parse scoop config.json for root_path
+	g_Config.ScoopConfigFile = filepath.Join(g_Config.ConfigHome, "scoop", "config.json")
 	//fmt.Println("*** configFile:", configFile)
 
 	//{
@@ -205,26 +227,39 @@ func loadScoopConfig() (err error) {
 	//	"SCOOP_REPO": "https://github.com/ScoopInstaller/Scoop",
 	//	"SCOOP_BRANCH": "master"
 	//}
-	body, err := ioutil.ReadFile(g_Config.ConfigFile)
+	body, err := os.ReadFile(g_Config.ScoopConfigFile)
 	if err == nil && len(body) > 0 {
 		var parser fastjson.Parser
 		js, _ := parser.ParseBytes(body)
-		g_Config.ScoopDir = string(js.GetStringBytes("rootPath"))
-		g_Config.GlobalDir = string(js.GetStringBytes("globalPath"))
-		g_Config.CacheDir = string(js.GetStringBytes("cachePath"))
+		g_Config.ScoopDir = string(js.GetStringBytes("root_path"))
+		g_Config.ScoopGlobalDir = string(js.GetStringBytes("global_path"))
+		g_Config.ScoopCacheDir = string(js.GetStringBytes("cache_path"))
+		if DEBUG {
+			fmt.Printf("Loaded ScoopConfigFile=%s\n", g_Config.ScoopConfigFile)
+			fmt.Printf("ScoopDir=%s\n", g_Config.ScoopDir)
+		}
 	}
 
-	//scoopDir string // $env:SCOOP, (get_config 'rootPath'), "$env:USERPROFILE\scoop"
-	// env overwrites config
+	// https://github.com/42wim/scoop-bucket/blob/master/.appveyor.yml
+	// environment:
+	// 	 SCOOP: C:\projects\scoop
+	// 	 SCOOP_HOME: C:\projects\scoop\apps\scoop\current
+
+	// scoopDir string // $env:SCOOP, (get_config 'rootPath'), "$env:USERPROFILE\scoop"
+	// env overrides config!
 	if value, ok := os.LookupEnv("SCOOP"); ok {
 		g_Config.ScoopDir = value
-		//fmt.Println("*** SCOOP ENV!:", scoopHome)
+		if DEBUG {
+			fmt.Printf("ScoopDir=$env:SCOOP=%s\n", g_Config.ScoopDir)
+		}
 	}
 
-	// if it's not in the env or config file
+	// if it's not in the env OR config file
 	if g_Config.ScoopDir == "" {
 		g_Config.ScoopDir = filepath.Join(g_Config.UserHome, "scoop")
-		//fmt.Println("*** default userHome scoopHome:", scoopHome)
+		if DEBUG {
+			fmt.Printf("ScoopDir=(no config)=%s\n", g_Config.ScoopDir)
+		}
 	}
 
 	g_Config.ScoopDir = strings.ReplaceAll(g_Config.ScoopDir, "/", "\\")
@@ -232,24 +267,36 @@ func loadScoopConfig() (err error) {
 	//globalDir string // $env:SCOOP_GLOBAL, (get_config 'globalPath'), "$env:ProgramData\scoop"
 	globalDir := os.Getenv("SCOOP_GLOBAL")
 	if globalDir != "" {
-		g_Config.GlobalDir = globalDir
+		g_Config.ScoopGlobalDir = globalDir
+		if DEBUG {
+			fmt.Printf("ScoopGlobalDir=$env:SCOOP_GLOBAL=%s\n", g_Config.ScoopGlobalDir)
+		}
 	}
-	if g_Config.GlobalDir == "" {
-		g_Config.GlobalDir = filepath.Join(os.Getenv("ProgramData"), "scoop")
+	if g_Config.ScoopGlobalDir == "" {
+		g_Config.ScoopGlobalDir = filepath.Join(os.Getenv("ProgramData"), "scoop")
+		if DEBUG {
+			fmt.Printf("ScoopGlobalDir=(no config)=%s\n", g_Config.ScoopGlobalDir)
+		}
 	}
 
-	g_Config.GlobalDir = strings.ReplaceAll(g_Config.GlobalDir, "/", "\\")
+	g_Config.ScoopGlobalDir = strings.ReplaceAll(g_Config.ScoopGlobalDir, "/", "\\")
 
 	//cacheDir string // $env:SCOOP_CACHE, (get_config 'cachePath'), "$scoopdir\cache"
 	cacheDir := os.Getenv("SCOOP_CACHE")
 	if cacheDir != "" {
-		g_Config.CacheDir = cacheDir
+		g_Config.ScoopCacheDir = cacheDir
+		//		if DEBUG {
+		//			fmt.Printf("ScoopCacheDir=$env:SCOOP_CACHE=%s\n", g_Config.ScoopCacheDir)
+		//		}
 	}
-	if g_Config.CacheDir == "" {
-		g_Config.CacheDir = filepath.Join(g_Config.ScoopDir, "cache")
+	if g_Config.ScoopCacheDir == "" {
+		g_Config.ScoopCacheDir = filepath.Join(g_Config.ScoopDir, "cache")
+		//		if DEBUG {
+		//			fmt.Printf("ScoopCacheDir=%s\n", g_Config.ScoopCacheDir)
+		//		}
 	}
 
-	g_Config.CacheDir = strings.ReplaceAll(g_Config.CacheDir, "/", "\\")
+	g_Config.ScoopCacheDir = strings.ReplaceAll(g_Config.ScoopCacheDir, "/", "\\")
 
 	g_Config.NamedSourceRefs = map[string]SourceRef{}
 
@@ -270,9 +317,16 @@ func timeTrack(start time.Time, name string) {
 
 func main() {
 	// uncomment to profile:
-	//defer profile.Start().Stop() // CPU profiling by default
+	//defer profile.Start(profile.CPUProfile, profile.ProfilePath(".")).Stop()
+	// https://github.com/mmcloughlin/profile
+	//defer profile.Start(
+	//	profile.AllProfiles,
+	//	profile.ConfigEnvVar("GO_PERF_PROFILE"),
+	//).Stop()
 
 	defer timeTrack(time.Now(), "Search")
+
+	DEBUG = slices.Contains(os.Args, "-debug")
 
 	// must be before parsing the command line due to g_Config.NamedSourceRefs
 	loadScoopConfig()
@@ -287,8 +341,6 @@ func main() {
 	if args.query.Pattern.String() == "" {
 		myUsage()
 	} else {
-		// merge semantic color names into color values
-
 		g_State.Run(args)
 	}
 
@@ -413,7 +465,7 @@ func printResults(buckets BucketMap, linelen int) (anyMatches bool) {
 	}
 
 	var globalInstalled = NameSourceMap{}
-	loadInstalledApps(g_Config.GlobalDir+"\\apps", &globalInstalled)
+	loadInstalledApps(g_Config.ScoopGlobalDir+"\\apps", &globalInstalled)
 	// ignore if global apps path doesn't exist
 
 	// reserve additional space assuming each variable string has length 1. Will save time on initial allocations
