@@ -17,6 +17,7 @@ jobs:
     permissions:
       contents: write
     steps:
+  
     # debug
     - name: Dump env
       run: env | sort
@@ -25,11 +26,7 @@ jobs:
       env:
         GITHUB_CONTEXT: ${{ toJSON(github) }}
       run: echo "$GITHUB_CONTEXT"
-      
-    - run: git version
-    - run: git branch
-    - run: git tag
-    
+
     # setup
     - name: Set up Go v1.20.4
       uses: actions/setup-go@v4
@@ -49,7 +46,12 @@ jobs:
       run: |
         go version
         GOOS=windows GOARCH=amd64 go build -v -o scoop-search-multisource.exe .
-
+    
+    # debug
+    - run: git version
+    - run: git branch
+    - run: git tag
+    
     # release
     - name: Release
       uses: softprops/action-gh-release@v1
