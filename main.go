@@ -76,6 +76,7 @@ type ScoopConfig struct {
 	// Scoop global apps directory
 	ScoopGlobalDir  string // $env:SCOOP_GLOBAL, (get_config 'globalPath'), "$env:ProgramData\scoop"
 	ScoopCacheDir   string // $env:SCOOP_CACHE, (get_config 'cachePath'), "$scoopdir\cache"
+	ScoopProxy      string
 	NamedSourceRefs map[string]SourceRef
 }
 
@@ -234,6 +235,7 @@ func loadScoopConfig() (err error) {
 		g_Config.ScoopDir = string(js.GetStringBytes("root_path"))
 		g_Config.ScoopGlobalDir = string(js.GetStringBytes("global_path"))
 		g_Config.ScoopCacheDir = string(js.GetStringBytes("cache_path"))
+		g_Config.ScoopProxy = string(js.GetStringBytes("proxy"))
 		if DEBUG {
 			fmt.Printf("Loaded ScoopConfigFile=%s\n", g_Config.ScoopConfigFile)
 			fmt.Printf("ScoopDir=%s\n", g_Config.ScoopDir)
