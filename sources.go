@@ -445,7 +445,32 @@ func cacheGetUrl(cacheFilePath string, url string) (err error) {
 
 	if !cache_exists || g_CacheDuration < age {
 		fmt.Printf("Downloading: %s\n", url)
-		response, err := http.Get(url)
+
+		cli := http.Client{}
+		if g_Config.ScoopProxy != "" {
+			// https://github.com/ScoopInstaller/Scoop/wiki/Using-Scoop-behind-a-proxy#config-examples
+			proxy := "http://" + g_Config.ScoopProxy
+			url, err := net_url.Parse(proxy)
+			// todo proxy password containing `@` or `:`
+			if err == nil {
+				transport := &http.Transport{Proxy: http.ProxyURL(url)}
+				cli.Transport = transport
+
+				switch tv := http.DefaultTransport.(type) {
+				case *http.Transport:
+					{
+						transport.DialContext = tv.DialContext
+						transport.ForceAttemptHTTP2 = tv.ForceAttemptHTTP2
+						transport.MaxIdleConns = tv.MaxIdleConns
+						transport.IdleConnTimeout = tv.IdleConnTimeout
+						transport.TLSHandshakeTimeout = tv.TLSHandshakeTimeout
+						transport.ExpectContinueTimeout = tv.ExpectContinueTimeout
+					}
+				}
+			}
+		}
+
+		response, err := cli.Get(url)
 		if err != nil { // default to cache
 			return err
 		}
