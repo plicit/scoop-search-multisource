@@ -59,7 +59,7 @@ MERGED RESULTS:
 > scoops -help
 scoop-search-multisource.exe : Searches Scoop buckets: local, remote, zip, html
 
-VERSION: 0.1.20230520
+VERSION: 0.1.20240202
    HOME: https://github.com/plicit/scoop-search-multisource
 
   ALIAS: scoops.exe
@@ -110,10 +110,10 @@ If you use Powershell, then instead of using `scoop-search-multisource.exe <term
 Add this to your Powershell profile (usually located at `$PROFILE`)
 
 ```
-PS > Invoke-Expression (&scoop-search-multisource --hook)
+Invoke-Expression (&scoop-search-multisource --hook)
 ```
 
-The hook is:
+The code returned by `scoop-search-multisource --hook` is:
 
 ```ps1
 function scoop { if ($args[0] -eq "search") { scoop-search-multisource.exe @($args | Select-Object -Skip 1) } else { scoop.ps1 @args } }
@@ -142,6 +142,8 @@ Summary
     1.55 ± 0.08 times faster than 'scoop-search-multisource -source :rasa google'
    47.54 ± 2.08 times faster than 'scoop search google'
 ```
+
+NOTE: depending upon the number of and size of buckets that you have locally, there can be a long delay when their manifest .json files are first read (and cached) by Windows.  Subsequent executions are much faster until Windows deletes that cache.  ([Issue #4](https://github.com/mertd/shovel-data))
 
 ## Related projects
 

@@ -21,7 +21,7 @@ import (
 	// _ "github.com/mutecomm/go-sqlcipher/v4"
 )
 
-var g_Version = "v0.1.20230520"
+var g_Version = "v0.1.20240202"
 
 type SearchQuery struct {
 	Pattern *regexp.Regexp
